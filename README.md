@@ -131,3 +131,276 @@ Uproszczona wersja na **ESP32-C3 SuperMini** (RISC-V).
 | Hallotron | 3 (opcjonalnie) |
 
 ### Schemat (ESP32-S3)
+ESP32-S3 SuperMini
+┌─────────────────┐
+│ │
+GPS TX ──────►│ GPIO12 (UART RX)│
+GPS RX ◄──────│ GPIO13 (UART TX)│
+│ │
+3.3V ──[100kΩ]─┼─┬─[NTC]───┐ │
+│ │ │ │
+│ └─► GPIO11│ │
+│ │ │
+Hallotron ──────┼─► GPIO10 │ │
+│ │ │
+Bateria(+) ─[100kΩ]─┬─[100kΩ]─┐│
+│ │ ││
+│ └─► GPIO8││
+│ ││
+Bateria(-) ─────┴──────────┴┘
+│
+[1000µF/6.3V]
+│
+GND
+
+---
+
+## Instalacja oprogramowania
+
+### Wymagania
+
+- Arduino IDE 2.0+
+- Zainstalowane wsparcie dla ESP32 (Board Manager)
+
+### Instalacja ESP32 w Arduino IDE
+
+1. **Plik → Preferencje** → dodaj URL:
+
+2. 2. **Narzędzia → Płyta → Menadżer płyt** → zainstaluj `ESP32`
+
+### Ustawienia dla ESP32-S3
+
+| Ustawienie | Wartość |
+|------------|---------|
+| Board | ESP32S3 Dev Module |
+| USB Mode | CDC (Native USB) |
+| USB CDC On Boot | Enabled |
+| CPU Frequency | 80 MHz |
+| Flash Mode | DIO |
+| Flash Size | 4MB (32Mb) |
+| Partition Scheme | Default 4MB with spiffs |
+| PSRAM | OPI PSRAM |
+| Upload Speed | 921600 |
+
+### Ustawienia dla ESP32-C3
+
+| Ustawienie | Wartość |
+|------------|---------|
+| Board | ESP32C3 Dev Module |
+| CPU Frequency | 160 MHz |
+| Flash Mode | DIO |
+| Flash Size | 4MB (32Mb) |
+| Partition Scheme | Default 4MB with spiffs |
+| Upload Speed | 921600 |
+
+### Wgrywanie programu
+
+1. Pobierz pliki: `fsr_speed_v95_ino.ino` i `html.h`
+2. Umieść je w jednym katalogu
+3. Otwórz `.ino` w Arduino IDE
+4. Wybierz płytę i port COM
+5. Kliknij **Wgraj**
+
+---
+
+## Konfiguracja
+
+### Pierwsze uruchomienie
+
+1. ESP32 utworzy sieć Wi-Fi `FSR_speed`
+2. Połącz się hasłem `1234567890`
+3. W przeglądarce wejdź na `http://192.168.4.1`
+4. Poczekaj na FIX GPS (zielone kółko)
+
+### Ustawienia w interfejsie
+
+| Kategoria | Parametr | Domyślnie |
+|-----------|----------|-----------|
+| Temperatura | Offset | 38.0 |
+| Temperatura | Skala | 1.0 |
+| Wi-Fi | Moc nadajnika (S3) | 8.5 dBm |
+| Wi-Fi | Tryb (S3) | n |
+| Wi-Fi | SSID | FSR_speed |
+| Wi-Fi | Hasło | 1234567890 |
+| GPS | Baud | 230400 |
+| GPS | Pin RX | 12 (S3) / 5 (C3) |
+| GPS | Pin TX | 13 (S3) / 6 (C3) |
+
+---
+
+## Obsługa systemu
+
+### Przyciski
+
+| Przycisk | Funkcja |
+|----------|---------|
+| 🎯 CENTRUJ | Centruje mapę na łodzi |
+| 🏆 RESET VMAX/ACCEL | Zeruje rekordy |
+| 🗑️ RESET TRASY | Czyści trasę |
+| 💾 ZAPISZ TRASĘ | Pobiera GPX |
+| 🏁 USTAW LINIĘ START/META | Ustawia punkt start/meta |
+| ⚙️ USTAWIENIA | Panel konfiguracji |
+
+### Okrążenia
+
+1. Ustaw punkt start/meta (przycisk na mapie)
+2. System wykrywa wejście w promień 15 m
+3. Liczy okrążenia i mierzy czasy
+4. Zapamiętuje najlepszy czas
+
+### Wizualizacja na mapie
+
+| Element | Kolor |
+|---------|-------|
+| Aktualna pozycja | Niebieskie kółko |
+| Trasa | Niebieska linia |
+| VMAX | Pomarańczowa dymka |
+| Max Accel | Złota dymka |
+| Start/Meta | Czerwone kółko |
+
+---
+
+## Funkcje zaawansowane
+
+### Wzory obliczeniowe
+
+**Prędkość** – z NMEA RMC, filtr antydryf 3 km/h.
+
+**Przyspieszenie**  
+`a = (V_current - V_last) / dt`  
+`G = a / 9.80665`
+
+**Temperatura (NTC 100kΩ, Beta=3950)**  
+`R = (100000 * V_adc) / (3.3 - V_adc)`  
+`1/T = A + B*ln(R) + C*(ln(R))³`  
+Stałe: A=0.001129148, B=0.000234125, C=0.0000000876741
+
+**Obroty (RPM)**  
+`RPM = (impulsy * 60000) / dt`
+
+**Dystans** – wzór haversine, promień Ziemi 6371 km.
+
+### Filtry
+
+| Filtr | Wartość |
+|-------|---------|
+| Antydryf | 3 km/h |
+| Mediana pozycji | 5 próbek |
+| HDOP | < 2.0 |
+| SAT | ≥ 4 |
+| Dystans punktów | ≥ 0.5 m |
+
+### Komendy GPS
+
+| Komenda | Opis |
+|---------|------|
+| `$PMTK220,100*2F` | 10 Hz |
+| `$PMTK314,0,1,0,1,...*28` | Tylko GGA i RMC |
+| `$PMTK251,230400*...` | Zmiana baudrate |
+| `$PMTK286,1*23` | Zapis do pamięci |
+
+---
+
+## Rozwiązywanie problemów
+
+### Brak sieci Wi-Fi
+
+- Sprawdź wybór płyty (ESP32S3 Dev Module)
+- Naciśnij RESET po wgraniu
+- Zmniejsz moc w ustawieniach (8.5 dBm)
+
+### GPS nie ma FIX
+
+- Zapewnij widok na niebo
+- Sprawdź piny (TX→GPIO12, RX→GPIO13)
+- Poczekaj 1-2 minuty
+
+### Temperatura 0°C
+
+- Włącz czujnik w ustawieniach
+- Sprawdź połączenie termistora
+
+### Brak RPM
+
+- Włącz czujnik
+- Ustaw magnes 2-5 mm od Hallotrona
+- Sprawdź polaryzację (biegun N)
+
+### Mały zasięg Wi-Fi (S3)
+
+- Zwiększ moc do 19.5 dBm
+- Ustaw tryb 802.11b
+- Użyj anteny GP 5/8
+
+---
+
+## Dane techniczne
+
+### ESP32-S3
+
+| Parametr | Wartość |
+|----------|---------|
+| Procesor | Xtensa LX7 dual-core |
+| Częstotliwość | 240 MHz |
+| Flash | 4 MB |
+| PSRAM | 2 MB |
+| Wi-Fi | 802.11 b/g/n |
+| GPIO | 18 |
+
+### ESP32-C3
+
+| Parametr | Wartość |
+|----------|---------|
+| Procesor | RISC-V single-core |
+| Częstotliwość | 160 MHz |
+| Flash | 4 MB |
+| RAM | 400 KB |
+| Wi-Fi | 802.11 b/g/n |
+| GPIO | 14 |
+
+### GPS HT1818Z3G5L
+
+| Parametr | Wartość |
+|----------|---------|
+| Chip | AT6558R |
+| Systemy | GPS + BDS |
+| Częstotliwość | 10 Hz |
+| Czułość | -165 dBm |
+| Dokładność | 2.5 m |
+
+### NTC 100kΩ
+
+| Temp. | Rezystancja |
+|-------|-------------|
+| 0°C | ~327 kΩ |
+| 25°C | 100 kΩ |
+| 50°C | ~36 kΩ |
+| 100°C | ~6.8 kΩ |
+| 150°C | ~2.2 kΩ |
+
+---
+
+## Wersje oprogramowania
+
+| Wersja | Data | Zmiany |
+|--------|------|--------|
+| v9.0 | 2025-01 | Podstawowa |
+| v9.1 | 2025-02 | Autodetekcja GPS, 10Hz |
+| v9.2 | 2025-03 | Wykresy po lewej, tryb mobilny |
+| v9.3 | 2025-04 | Dymki VMAX/ACCEL |
+| v9.4 | 2026-04 | Okrążenia, regulacja mocy Wi-Fi |
+| v9.5 | 2026-04 | Wsparcie dla ESP32-C3 |
+
+---
+
+## Licencja
+
+Projekt open-source.
+
+## Autorzy
+
+**Maxiii** i **Deepseek**
+
+---
+
+**FSR Speed Tracker v9.5 – Profesjonalna telemetria dla Twojej łodzi wyścigowej** 🚤
