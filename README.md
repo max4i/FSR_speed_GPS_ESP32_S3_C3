@@ -20,10 +20,11 @@
 [<img src="zdj/1.jpg" width="300">](zdj/1.jpg)
 [<img src="zdj/2.jpg" width="300">](zdj/2.jpg)
 [<img src="zdj/3.jpg" width="300">](zdj/3.jpg)
-[<img src="zdj/4.jpg" width="300">](zdj/4.jpg)
-[<img src="zdj/5.jpg" width="300">](zdj/5.jpg)
 [<img src="zdj/6.jpg" width="300">](zdj/6.jpg)
 [<img src="zdj/c3.jpg" width="300">](zdj/c3.jpg)
+
+[<img src="zdj/5.jpg" width="300">](zdj/5.jpg)
+[<img src="zdj/4.jpg" width="300">](zdj/4.jpg)
 ## Opis ogólny
 
 System telemetrii dla łodzi wyścigowych **FSR** (Formuła Silnikowa Remote control) umożliwiający śledzenie parametrów pracy jednostki w czasie rzeczywistym. Urządzenie tworzy własną sieć Wi-Fi, do której można podłączyć telefon, tablet lub laptop, a następnie w przeglądarce internetowej obserwować:
