@@ -17,6 +17,7 @@
 11. [Dane techniczne](#dane-techniczne)
 
 ---
+[<img src="zdj/1.jpg" width="300">](zdj/1.jpg)
 
 ## Opis ogólny
 
