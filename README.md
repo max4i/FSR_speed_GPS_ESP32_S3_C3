@@ -18,6 +18,7 @@
 
 ---
 [<img src="zdj/1.jpg" width="300">](zdj/1.jpg)
+[<img src="zdj/1.jpg" width="300">](zdj/2.jpg)
 
 ## Opis ogólny
 
