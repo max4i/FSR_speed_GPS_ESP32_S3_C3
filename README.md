@@ -401,6 +401,137 @@ Stałe: A=0.001129148, B=0.000234125, C=0.0000000876741
 | v9.5 | 2026-04 | Wsparcie dla ESP32-C3 |
 
 ---
+# FSR Speed ACC v0.9 – pomiar prędkości z dużą dokładnością przy wykorzystaniu ADXL345
+
+System pomiaru prędkości, trasy i okrążeń dla łodzi FSR (Formuła Silnikowa RC).  
+Łączy moduł GPS (AT6558R, 10Hz) z akcelerometrem ADXL345 (I2C) na platformie **ESP32-S3**.  
+Dane są wyświetlane w czasie rzeczywistym na mapie satelitarnej przez przeglądarkę (Wi-Fi AP lub STA).  
+
+---
+
+## 🔧 Zastosowane filtry
+
+| Filtr | Opis |
+|-------|------|
+| **Antydryf** | Odrzuca prędkości < 5 km/h (eliminacja szumów postojowych) |
+| **Mediana prędkości** | 3-próbkowa mediana surowego odczytu GPS (szybka reakcja) |
+| **Filtr Hampela** | Wykrywa i odrzuca pojedyncze outlier’y („szpilki”) w akcelerometrze |
+| **Savitzky–Golay** | Wygładzanie oknem 7 próbek, zachowujące szczyty prędkości |
+| **Butterworth (LPF)** | Dolnoprzepustowy 20 Hz – odcina drgania silnika (>50 Hz) |
+| **Adaptacyjna fuzja GPS/ACC** | Dynamiczne ważenie sygnałów w zależności od HDOP i przyspieszenia |
+| **Filtr Kalmana** | Optymalna estymacja prędkości z modelu szumów |
+| **Mediana końcowa** | 10-próbkowa mediana przed wyświetleniem |
+
+---
+
+## 📡 Podłączenie (ESP32-S3 SuperMini)
+
+| Komponent | GPIO |
+|-----------|------|
+| GPS TX → ESP RX | 12 |
+| GPS RX ← ESP TX | 13 |
+| ADXL345 SCL | 8 |
+| ADXL345 SDA | 9 |
+| Termistor NTC | 11 (przez 100kΩ do 3.3V) |
+| Dzielnik baterii (2×100kΩ) | 10 |
+
+> **Uwaga:** Piny 19 i 20 są zajęte przez native USB ESP32-S3.
+
+---
+
+## 📐 Sposób liczenia danych
+
+### Prędkość
+- Odczyt NMEA RMC (`gps.speed.kmph()`)
+- Filtr antydryf i mediana 3 próbek
+- Fuzja z akcelerometrem:  
+  `v_fused = 0.7·v_gps + 0.3·(v_fused + ∫a·dt)`
+
+### Przyspieszenie
+- Akcelerometr ADXL345 (zakres ±16G)
+- Kalibracja offsetów (przycisk w UI)
+- Filtr Butterworth 20 Hz + Hampel
+
+### VMAX (prędkość maksymalna)
+- Rejestrowana tylko gdy **HDOP < 1.4** i **SAT ≥ 6**
+- Zapisywana do historii (max 10 wartości, wyświetlane 4 ostatnie unikalne)
+
+### Okrążenia
+- Ustawienie linii start/meta przez przycisk na mapie
+- Promień wykrywania: 15 m
+- Mierzony czas okrążenia i najlepszy czas
+
+### Dystans
+- Wzór haversine (promień Ziemi 6371 km)
+- Minimalna odległość między punktami trasy: 0.5 m
+
+### Dokładność prędkości (wyświetlana jako `Dok: ±x.xxx km/h`)
+Dokładność = 0.36 × K_sat × K_hdop × (1/√3)
+
+text
+- `0.36 km/h` – bazowa dokładność GPS AT6558R (0.1 m/s)
+- `K_sat = 1 - (SAT-4)/30` (ograniczony do 0.3–1.0)
+- `K_hdop = HDOP / 1.0` (ograniczony do 0.5–2.0)
+
+Przykładowo: **SAT=20, HDOP=0.7** → dokładność ±0.068 km/h.
+
+---
+
+## 📊 Osiągane dokładności
+
+| Warunki | SAT | HDOP | Dokładność statyczna | Błąd dystansu (40 km) |
+|---------|-----|------|----------------------|------------------------|
+| Optymalne (otwarta woda) | ≥20 | 0.3–0.6 | ±0.03–0.07 km/h | ±12–28 m |
+| Dobre (małe fale) | 10–19 | 0.6–1.0 | ±0.07–0.15 km/h | ±28–60 m |
+| Przeciętne | 6–9 | 1.0–1.4 | ±0.15–0.24 km/h | ±60–96 m |
+
+> VMAX zapisywany tylko przy **SAT ≥ 6** i **HDOP < 1.4**.
+
+---
+
+## 🌐 Dostęp przez przeglądarkę
+
+- **Tryb AP** (domyślnie): SSID `FSR_ACC`, hasło `12345678` → IP `192.168.4.1`
+- **Tryb STA** (jeśli skonfigurowano): ESP32 łączy się z istniejącą siecią Wi-Fi
+- **Nazwa lokalna:** `http://fsr.local` (mDNS)
+
+---
+
+## 📁 Struktura projektu
+/
+├── fsr_speed_acc.ino # kod główny
+├── html_acc.h # strona główna (mapa, dane)
+├── info.h # strona informacyjna
+└── config.json # automatycznie tworzony plik konfiguracji
+
+text
+
+---
+
+## ⚙️ Konfiguracja w Arduino IDE (ESP32-S3)
+
+| Ustawienie | Wartość |
+|------------|---------|
+| Board | ESP32S3 Dev Module |
+| USB Mode | CDC (Native USB) |
+| CPU Frequency | 240 MHz |
+| Flash Mode | QIO |
+| Flash Size | 4MB (32Mb) |
+| Partition Scheme | No OTA (2MB APP/2MB SPIFFS) |
+| PSRAM | QSPI PSRAM |
+
+---
+
+## 🚤 Przykład użycia
+
+1. Wgraj kod do ESP32-S3.
+2. Połącz się z siecią `FSR_ACC` (hasło `12345678`).
+3. Otwórz `http://fsr.local` lub `http://192.168.4.1`.
+4. Zaczekaj na fix GPS (zielony wskaźnik).
+5. Rozpocznij jazdę – na mapie pojawi się trasa, prędkość i okrążenia.
+6. Aby ustawić linię start/meta – kliknij przycisk **🏁 USTAW START** w pozycji gdzie chcesz rozpocząć pomiar okrążeń.
+
+---
 
 ## Licencja
 
